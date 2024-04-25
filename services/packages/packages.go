@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/url"
 	"strings"
-	"sync"
 
 	"code.gitea.io/gitea/models/db"
 	packages_model "code.gitea.io/gitea/models/packages"
@@ -31,17 +30,6 @@ var (
 	ErrQuotaTotalSize  = errors.New("maximum allowed package storage quota exceeded")
 	ErrQuotaTotalCount = errors.New("maximum allowed package count exceeded")
 )
-
-var mutexMap sync.Map
-
-func getOrCreateMutex(name string) *sync.Mutex {
-	mutex, ok := mutexMap.Load(name)
-	if !ok {
-		newMutex := &sync.Mutex{}
-		mutex, _ = mutexMap.LoadOrStore(name, newMutex)
-	}
-	return mutex.(*sync.Mutex)
-}
 
 // PackageInfo describes a package
 type PackageInfo struct {
@@ -88,13 +76,6 @@ func CreatePackageOrAddFileToExisting(ctx context.Context, pvci *PackageCreation
 }
 
 func createPackageAndAddFile(ctx context.Context, pvci *PackageCreationInfo, pfci *PackageFileCreationInfo, allowDuplicate bool) (*packages_model.PackageVersion, *packages_model.PackageFile, error) {
-
-	mutex := getOrCreateMutex(pvci.PackageType.Name())
-	mutex.Lock()
-	defer func() {
-		mutex.Unlock()
-	}()
-
 	dbCtx, committer, err := db.TxContext(ctx)
 	if err != nil {
 		return nil, nil, err
