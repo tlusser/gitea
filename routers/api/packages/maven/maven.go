@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	packages_model "code.gitea.io/gitea/models/packages"
 	"code.gitea.io/gitea/modules/context"
@@ -45,6 +46,8 @@ const (
 var (
 	errInvalidParameters = errors.New("request parameters are invalid")
 	illegalCharacters    = regexp.MustCompile(`[\\/:"<>|?\*]`)
+
+	uploadMutex = &sync.Mutex{}
 )
 
 func apiError(ctx *context.Context, status int, obj any) {
@@ -228,6 +231,10 @@ func servePackageFile(ctx *context.Context, params parameters, serveContent bool
 
 // UploadPackageFile adds a file to the package. If the package does not exist, it gets created.
 func UploadPackageFile(ctx *context.Context) {
+	// Ensure only ONE maven package is uploaded at a time.
+	uploadMutex.Lock()
+	defer uploadMutex.Unlock()
+
 	params, err := extractPathParameters(ctx)
 	if err != nil {
 		apiError(ctx, http.StatusBadRequest, err)
